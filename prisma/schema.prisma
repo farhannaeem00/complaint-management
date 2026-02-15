@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+  TECHNICIAN
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Status {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  REJECTED
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum FeedbackType {
+  ACADEMIC
+  FACILITY
+  GENERAL
+}
+
+enum NotificationType {
+  NEW_COMPLAINT
+  ASSIGNED
+  REJECTED
+  DEADLINE_MISSED
+  RESOLVED
+  VERIFIED
+}
+
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  studentId   String?
+  role        Role
+  department  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  complaintsCreated   Complaint[]      @relation("StudentComplaints")
+  complaintsAssigned  Complaint[]      @relation("TechnicianComplaints")
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
+
+  @@index([email])
+  @@index([role])
+  @@index([studentId])
+}
+
+model Category {
+  id         String      @id @default(uuid())
+  name       String      @unique
+  department String?
+  createdAt  DateTime    @default(now())
+  
+  complaints Complaint[]
+
+  @@index([name])
+}
+
+model Complaint {
+  id                  String   @id @default(uuid())
+  title               String
+  description         String   @db.Text
+  priority            Priority @default(MEDIUM)
+  status              Status   @default(PENDING)
+  deadline            DateTime?
+  rejectionReason     String?  @db.Text
+  adminVerification   Boolean  @default(false)
+  feedbackSubmitted   Boolean  @default(false)
+  escalationLevel     Int      @default(0)
+  department          String
+  
+  categoryId          String
+  category            Category @relation(fields: [categoryId], references: [id])
+  
+  studentId           String
+  student             User     @relation("StudentComplaints", fields: [studentId], references: [id])
+  
+  technicianId        String?
+  technician          User?    @relation("TechnicianComplaints", fields: [technicianId], references: [id])
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  feedbacks           Feedback[]
+  activityLogs        ActivityLog[]
+
+  @@index([studentId])
+  @@index([technicianId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([deadline])
+}
+
+model Feedback {
+  id           String       @id @default(uuid())
+  complaintId  String
+  complaint    Complaint    @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  feedbackType FeedbackType
+  message      String       @db.Text
+  rating       Int
+  anonymous    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  @@index([complaintId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String           @db.Text
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id          String    @id @default(uuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  action      String
+  description String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@index([complaintId])
+  @@index([userId])
+  @@index([createdAt])
+}
